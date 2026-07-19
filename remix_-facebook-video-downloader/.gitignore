@@ -1,0 +1,12 @@
+# Local environment variables
+.env
+.env.local
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Vercel deployment folder
+.vercel/
