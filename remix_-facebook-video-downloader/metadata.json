@@ -1,0 +1,8 @@
+{
+  "name": "Khush Facebook Video Downloader",
+  "description": "Download direct Facebook stream URLs using direct backend proxy streaming to bypass browser player issues and cross-origin restrictions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
