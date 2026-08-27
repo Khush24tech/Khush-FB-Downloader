@@ -23,7 +23,7 @@
 import sys
 
 this_python = sys.version_info[:2]
-min_version = (3, 10)
+min_version = (3, 11)
 if this_python < min_version:
     message_parts = [
         "This script does not work on Python {}.{}.".format(*this_python),
