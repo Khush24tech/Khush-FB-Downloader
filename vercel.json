@@ -1,13 +1,15 @@
 {
   "version": 2,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/download.py"
-    },
+      "src": "api/download.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
     {
-      "source": "/((?!api/).*)",
-      "destination": "/server.ts"
+      "src": "/(.*)",
+      "destination": "api/download.py"
     }
   ]
 }
