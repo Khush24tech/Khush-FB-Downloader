@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://khushfbdownloader.online/sitemap.xml
