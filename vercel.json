@@ -1,15 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/download.py",
-      "use": "@vercel/python"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/download.py": {
+      "maxDuration": 60
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "destination": "api/download.py"
-    }
-  ]
+  }
 }
