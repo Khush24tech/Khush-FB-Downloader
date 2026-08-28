@@ -1,28 +1,45 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from urllib.parse import urlparse
 import yt_dlp
 import requests
 import os
+import re
 
 app = FastAPI()
 
 class VideoRequest(BaseModel):
     url: str
 
+    @field_validator('url')
+    @classmethod
+    def sanitize_and_validate_url(cls, v: str) -> str:
+        v = v.strip()
+        dangerous_patterns = [r"<script>", r"javascript:", r"exec\(", r"eval\(", r"__import__", r"os\.system"]
+        for pattern in dangerous_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError("Malicious or unauthorized pattern detected in input.")
+
+        fb_pattern = r"^https?:\/\/(?:[a-zA-Z0-9-]+\.)?(facebook\.com|fb\.watch|fb\.me|fb\.gg)\/.+$"
+        if not re.match(fb_pattern, v, re.IGNORECASE):
+            raise ValueError("Invalid URL. Only official Facebook, Reels, or Watch links are allowed.")
+            
+        return v
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
 @app.post("/api/get_info")
 async def get_video_info(data: VideoRequest):
-    url = data.url.strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="URL cannot be empty")
+    url = data.url
         
-    # Basic URL validation for Facebook domains
-    is_fb = any(domain in url.lower() for domain in ["facebook.com", "fb.watch", "fb.com", "fb.gg"])
-    if not is_fb:
-        raise HTTPException(status_code=400, detail="Please provide a valid Facebook, Reels, or Watch URL")
-
     try:
         ydl_opts = {
             'format': 'best',
@@ -63,18 +80,15 @@ async def get_video_info(data: VideoRequest):
 @app.get("/api/proxy_stream")
 async def proxy_stream(stream_url: str):
     try:
-        # Parse the incoming URL to check its domain
         parsed_url = urlparse(stream_url)
         allowed_domains = ["fbcdn.net", "facebook.com", "instagram.com"]
         
-        # Verify the domain ends with an allowed host
         if not any(parsed_url.netloc.endswith(domain) for domain in allowed_domains):
             raise HTTPException(status_code=403, detail="Access denied: Invalid stream source.")
             
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
         response = requests.get(stream_url, headers=headers, stream=True)
         
-        # Check Content-Length header (in bytes). 50MB = 50 * 1024 * 1024
         content_length = response.headers.get('Content-Length')
         if content_length and int(content_length) > 52428800:
             raise HTTPException(status_code=413, detail="Video file is too large for the free tier.")
@@ -97,22 +111,18 @@ async def proxy_stream(stream_url: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Proxy Failed: {str(e)}")
 
-# Static files mount for local runtime serving /public directory
-if os.path.exists("public"):
-    app.mount("/static", StaticFiles(directory="public"), name="static")
-
-    @app.get("/", response_class=HTMLResponse)
-    async def read_index():
-        return FileResponse("public/index.html")
-
-from fastapi.responses import Response
-import os
-
 @app.get("/sitemap.xml")
 async def get_sitemap():
     sitemap_path = os.path.join("public", "sitemap.xml")
     if os.path.exists(sitemap_path):
         with open(sitemap_path, "r", encoding="utf-8") as f:
             content = f.read()
-        return Response(content=content, media_type="application/xml")
-    return Response(content="Sitemap not found", status_code=404)
+        return FastAPIResponse(content=content, media_type="application/xml")
+    return FastAPIResponse(content="<error>Sitemap not found</error>", status_code=404, media_type="application/xml")
+
+if os.path.exists("public"):
+    app.mount("/static", StaticFiles(directory="public"), name="static")
+
+    @app.get("/", response_class=HTMLResponse)
+    async def read_index():
+        return FileResponse("public/index.html")
