@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://khushfbdownloader.online/sitemap.xml
+Sitemap: https://www.khushfbdownloader.online/sitemap.xml
