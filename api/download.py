@@ -104,3 +104,15 @@ if os.path.exists("public"):
     @app.get("/", response_class=HTMLResponse)
     async def read_index():
         return FileResponse("public/index.html")
+
+from fastapi.responses import Response
+import os
+
+@app.get("/sitemap.xml")
+async def get_sitemap():
+    sitemap_path = os.path.join("public", "sitemap.xml")
+    if os.path.exists(sitemap_path):
+        with open(sitemap_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return Response(content=content, media_type="application/xml")
+    return Response(content="Sitemap not found", status_code=404)
