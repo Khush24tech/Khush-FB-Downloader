@@ -20,5 +20,13 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Download Video",
+      "short_name": "Download",
+      "description": "Open Khush FB Downloader",
+      "url": "/"
+    }
   ]
 }
