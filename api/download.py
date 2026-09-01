@@ -82,28 +82,44 @@ async def proxy_stream(stream_url: str, filename: str = "facebook_video"):
     try:
         parsed_url = urlparse(stream_url)
         allowed_domains = ["fbcdn.net", "facebook.com", "instagram.com"]
-        
-        if not any(parsed_url.netloc.endswith(domain) for domain in allowed_domains):
-            raise HTTPException(status_code=403, detail="Access denied: Invalid stream source.")
 
-        # Safely clean the filename supplied by the frontend.
-        # Removes characters that are invalid or unsafe in filenames.
+        if not any(parsed_url.netloc.endswith(domain) for domain in allowed_domains):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Invalid stream source."
+            )
+
+        # Clean the filename
         safe_filename = re.sub(r'[<>:"/\\|?*]', '', filename)
         safe_filename = re.sub(r'\s+', ' ', safe_filename).strip()
 
-        # Use a safe default if the supplied title is empty.
         if not safe_filename:
             safe_filename = "facebook_video"
 
-        # Prevent excessively long filenames.
+        # Limit filename length
         safe_filename = safe_filename[:100]
 
-        # Ensure the downloaded file has an MP4 extension.
+        # Ensure .mp4 extension
         if not safe_filename.lower().endswith(".mp4"):
             safe_filename += ".mp4"
-            
+
+        # Create an ASCII fallback for HTTP header compatibility.
+        # This prevents errors caused by emojis and other Unicode characters.
+        ascii_filename = safe_filename.encode(
+            "ascii",
+            "ignore"
+        ).decode("ascii").strip()
+
+        if not ascii_filename:
+            ascii_filename = "facebook_video.mp4"
+
+        if not ascii_filename.lower().endswith(".mp4"):
+            ascii_filename += ".mp4"
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/120.0.0.0 Safari/537.36'
         }
 
         response = requests.get(
@@ -111,7 +127,7 @@ async def proxy_stream(stream_url: str, filename: str = "facebook_video"):
             headers=headers,
             stream=True
         )
-        
+
         content_length = response.headers.get('Content-Length')
 
         if content_length and int(content_length) > 52428800:
@@ -119,7 +135,7 @@ async def proxy_stream(stream_url: str, filename: str = "facebook_video"):
                 status_code=413,
                 detail="Video file is too large for the free tier."
             )
-        
+
         def generate_file():
             for chunk in response.iter_content(chunk_size=128 * 1024):
                 if chunk:
@@ -129,7 +145,10 @@ async def proxy_stream(stream_url: str, filename: str = "facebook_video"):
             generate_file(),
             media_type="video/mp4",
             headers={
-                "Content-Disposition": f'attachment; filename="{safe_filename}"',
+                "Content-Disposition": (
+                    f'attachment; filename="{ascii_filename}"; '
+                    f"filename*=UTF-8\'\'{requests.utils.quote(safe_filename)}"
+                ),
                 "Cache-Control": "no-cache",
             }
         )
