@@ -55,7 +55,22 @@
                 </svg>
                 Khush <span class="text-slate-800">FB Downloader</span>
             </h1>
-            <a href="/" class="text-sm font-semibold bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-4 py-2 rounded-full transition-all">Reset Downloader</a>
+           <div class="flex items-center gap-2">
+    <button
+        id="installAppBtn"
+        class="hidden text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full transition-all shadow-sm"
+        type="button"
+    >
+        Install App
+    </button>
+
+    <a
+        href="/"
+        class="text-sm font-semibold bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-4 py-2 rounded-full transition-all"
+    >
+        Reset Downloader
+    </a>
+</div>
         </div>
     </header>
 
@@ -285,6 +300,54 @@
                 });
         });
     }
+</script>
+<script>
+    let deferredInstallPrompt = null;
+
+    const installAppBtn = document.getElementById('installAppBtn');
+
+    // Detect when the browser makes the PWA installable
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+
+        deferredInstallPrompt = event;
+
+        // Show our custom Install App button
+        if (installAppBtn) {
+            installAppBtn.classList.remove('hidden');
+        }
+    });
+
+    // Handle Install App button
+    if (installAppBtn) {
+        installAppBtn.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) {
+                return;
+            }
+
+            deferredInstallPrompt.prompt();
+
+            const { outcome } = await deferredInstallPrompt.userChoice;
+
+            console.log('PWA installation result:', outcome);
+
+            // The prompt can only be used once
+            deferredInstallPrompt = null;
+
+            installAppBtn.classList.add('hidden');
+        });
+    }
+
+    // Detect successful installation
+    window.addEventListener('appinstalled', () => {
+        console.log('Khush FB Downloader was installed.');
+
+        deferredInstallPrompt = null;
+
+        if (installAppBtn) {
+            installAppBtn.classList.add('hidden');
+        }
+    });
 </script>
 </body>
 </html>
