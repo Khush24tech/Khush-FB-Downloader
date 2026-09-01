@@ -78,20 +78,47 @@ async def get_video_info(data: VideoRequest):
         raise HTTPException(status_code=400, detail=detail)
 
 @app.get("/api/proxy_stream")
-async def proxy_stream(stream_url: str):
+async def proxy_stream(stream_url: str, filename: str = "facebook_video"):
     try:
         parsed_url = urlparse(stream_url)
         allowed_domains = ["fbcdn.net", "facebook.com", "instagram.com"]
         
         if not any(parsed_url.netloc.endswith(domain) for domain in allowed_domains):
             raise HTTPException(status_code=403, detail="Access denied: Invalid stream source.")
+
+        # Safely clean the filename supplied by the frontend.
+        # Removes characters that are invalid or unsafe in filenames.
+        safe_filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+        safe_filename = re.sub(r'\s+', ' ', safe_filename).strip()
+
+        # Use a safe default if the supplied title is empty.
+        if not safe_filename:
+            safe_filename = "facebook_video"
+
+        # Prevent excessively long filenames.
+        safe_filename = safe_filename[:100]
+
+        # Ensure the downloaded file has an MP4 extension.
+        if not safe_filename.lower().endswith(".mp4"):
+            safe_filename += ".mp4"
             
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-        response = requests.get(stream_url, headers=headers, stream=True)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+
+        response = requests.get(
+            stream_url,
+            headers=headers,
+            stream=True
+        )
         
         content_length = response.headers.get('Content-Length')
+
         if content_length and int(content_length) > 52428800:
-            raise HTTPException(status_code=413, detail="Video file is too large for the free tier.")
+            raise HTTPException(
+                status_code=413,
+                detail="Video file is too large for the free tier."
+            )
         
         def generate_file():
             for chunk in response.iter_content(chunk_size=128 * 1024):
@@ -102,14 +129,19 @@ async def proxy_stream(stream_url: str):
             generate_file(),
             media_type="video/mp4",
             headers={
-                "Content-Disposition": 'attachment; filename="facebook_video.mp4"',
+                "Content-Disposition": f'attachment; filename="{safe_filename}"',
                 "Cache-Control": "no-cache",
             }
         )
+
     except HTTPException as he:
         raise he
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Proxy Failed: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Proxy Failed: {str(e)}"
+        )
 
 @app.get("/sitemap.xml")
 async def get_sitemap():
@@ -118,7 +150,11 @@ async def get_sitemap():
         with open(sitemap_path, "r", encoding="utf-8") as f:
             content = f.read()
         return FastAPIResponse(content=content, media_type="application/xml")
-    return FastAPIResponse(content="<error>Sitemap not found</error>", status_code=404, media_type="application/xml")
+    return FastAPIResponse(
+        content="<error>Sitemap not found</error>",
+        status_code=404,
+        media_type="application/xml"
+    )
 
 if os.path.exists("public"):
     app.mount("/static", StaticFiles(directory="public"), name="static")
