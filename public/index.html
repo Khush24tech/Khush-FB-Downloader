@@ -242,57 +242,67 @@
     </footer>
 
     <script>
-        document.getElementById('downloadButton').addEventListener('click', async () => {
-            const urlInput = document.getElementById('videoUrlInput').value;
-            const downloadBtn = document.getElementById('downloadButton');
-            const buttonText = document.getElementById('buttonText');
-            const loadingSpinner = document.getElementById('loadingSpinner');
-            const statusMessage = document.getElementById('statusMessage');
-            const resultContainer = document.getElementById('resultContainer');
-            const videoPlayer = document.getElementById('videoPlayer');
+    document.getElementById('downloadButton').addEventListener('click', async () => {
+        const urlInput = document.getElementById('videoUrlInput').value;
+        const downloadBtn = document.getElementById('downloadButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultContainer = document.getElementById('resultContainer');
+        const videoPlayer = document.getElementById('videoPlayer');
 
-            statusMessage.classList.add('hidden');
-            resultContainer.classList.add('hidden');
-            videoPlayer.pause();
-            videoPlayer.src = "";
+        statusMessage.classList.add('hidden');
+        resultContainer.classList.add('hidden');
+        videoPlayer.pause();
+        videoPlayer.src = "";
 
-            if (!urlInput) {
-                statusMessage.textContent = "Please enter a Facebook URL.";
-                statusMessage.classList.remove('hidden');
-                return;
+        if (!urlInput) {
+            statusMessage.textContent = "Please enter a Facebook URL.";
+            statusMessage.classList.remove('hidden');
+            return;
+        }
+
+        downloadBtn.disabled = true;
+        buttonText.classList.add('hidden');
+        loadingSpinner.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/api/get_info', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: urlInput }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.detail || 'Extraction failed.');
             }
 
-            downloadBtn.disabled = true;
-            buttonText.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden');
+            document.getElementById('resultTitle').textContent = result.title;
+            videoPlayer.src = result.video_url;
+            resultContainer.classList.remove('hidden');
 
-            try {
-                const response = await fetch('/api/get_info', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url: urlInput }),
-                });
-                const result = await response.json();
-                if (!response.ok || !result.success) throw new Error(result.detail || 'Extraction failed.');
+            document.getElementById('saveVideoBtn').onclick = () => {
+                const filename = result.title || 'facebook_video';
 
-                document.getElementById('resultTitle').textContent = result.title;
-                videoPlayer.src = result.video_url;
-                resultContainer.classList.remove('hidden');
-                
-                document.getElementById('saveVideoBtn').onclick = () => {
-                    window.location.href = `/api/proxy_stream?stream_url=${encodeURIComponent(result.video_url)}`;
-                };
-            } catch (error) {
-                statusMessage.textContent = error.message;
-                statusMessage.classList.remove('hidden');
-                statusMessage.classList.add('text-red-600');
-            } finally {
-                downloadBtn.disabled = false;
-                buttonText.classList.remove('hidden');
-                loadingSpinner.classList.add('hidden');
-            }
-        });
-    </script>
+                const proxyUrl =
+                    `/api/proxy_stream?stream_url=${encodeURIComponent(result.video_url)}&filename=${encodeURIComponent(filename)}`;
+
+                window.location.href = proxyUrl;
+            };
+
+        } catch (error) {
+            statusMessage.textContent = error.message;
+            statusMessage.classList.remove('hidden');
+            statusMessage.classList.add('text-red-600');
+        } finally {
+            downloadBtn.disabled = false;
+            buttonText.classList.remove('hidden');
+            loadingSpinner.classList.add('hidden');
+        }
+    });
+</script>
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
